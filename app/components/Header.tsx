@@ -13,6 +13,8 @@ interface HeaderProps {
   onStopConversion: () => void;
   onStartConversion: (start: number, end: number) => void;
   onCloseFile: () => void;
+  apiKey: string;
+  onApiKeyChange: (key: string) => void;
 }
 
 export default function Header({
@@ -25,9 +27,12 @@ export default function Header({
   onStopConversion,
   onStartConversion,
   onCloseFile,
+  apiKey,
+  onApiKeyChange,
 }: HeaderProps) {
   const [startPage, setStartPage] = useState<string>("1");
   const [endPage, setEndPage] = useState<string>("");
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (totalPages > 0) {
@@ -91,6 +96,7 @@ export default function Header({
               value={startPage} onChange={(e) => setStartPage(e.target.value)}
               style={{ width: "40px", padding: "4px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border-primary)", background: "var(--color-bg-secondary)", color: "var(--color-text-primary)", fontSize: "12px", textAlign: "center" }}
               title="Start Page" placeholder="From"
+              disabled={convertedCount === totalPages && totalPages > 0}
             />
             <span style={{ color: "var(--color-text-tertiary)" }}>-</span>
             <input
@@ -98,8 +104,9 @@ export default function Header({
               value={endPage} onChange={(e) => setEndPage(e.target.value)}
               style={{ width: "40px", padding: "4px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border-primary)", background: "var(--color-bg-secondary)", color: "var(--color-text-primary)", fontSize: "12px", textAlign: "center" }}
               title="End Page" placeholder="To"
+              disabled={convertedCount === totalPages && totalPages > 0}
             />
-            <button className="btn btn-primary" style={{ padding: "4px 8px" }} onClick={() => onStartConversion(parseInt(startPage) || 1, parseInt(endPage) || totalPages)}>
+            <button className="btn btn-primary" style={{ padding: "4px 8px", opacity: (convertedCount === totalPages && totalPages > 0) ? 0.5 : 1, cursor: (convertedCount === totalPages && totalPages > 0) ? 'not-allowed' : 'pointer' }} onClick={() => onStartConversion(parseInt(startPage) || 1, parseInt(endPage) || totalPages)} disabled={convertedCount === totalPages && totalPages > 0}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               <span className="hide-on-mobile">Start</span>
             </button>
@@ -132,6 +139,66 @@ export default function Header({
             <span className="hide-on-mobile">Download</span>
           </button>
         )}
+
+        <div style={{ position: "relative" }}>
+          <button 
+            className="btn" 
+            onClick={() => setShowSettings(!showSettings)}
+            style={{ padding: "8px" }}
+            title="Settings"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
+
+          {showSettings && (
+            <div 
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                right: 0,
+                width: "280px",
+                background: "var(--color-bg-secondary)",
+                border: "1px solid var(--color-border-primary)",
+                borderRadius: "var(--radius-md)",
+                padding: "16px",
+                boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+                zIndex: 100,
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "600" }}>Settings</h3>
+                <button 
+                  onClick={() => setShowSettings(false)} 
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--color-text-tertiary)" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+              <p style={{ margin: 0, fontSize: "12px", color: "var(--color-text-tertiary)", lineHeight: "1.4" }}>
+                Enter your own Google Gemini API Key to bypass the server limits. Your key is stored locally in your browser.
+              </p>
+              <input
+                type="password"
+                placeholder="GEMINI_API_KEY"
+                value={apiKey}
+                onChange={(e) => onApiKeyChange(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--color-border-primary)",
+                  background: "var(--color-bg-primary)",
+                  color: "var(--color-text-primary)",
+                  fontSize: "13px",
+                  marginTop: "4px"
+                }}
+              />
+            </div>
+          )}
+        </div>
 
         <ThemeToggle />
       </div>

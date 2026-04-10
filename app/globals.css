@@ -546,6 +546,30 @@ body {
   letter-spacing: -0.025em;
 }
 
+.markdown-content ul {
+  list-style: disc outside !important;
+  padding-left: 2rem !important;
+  margin-bottom: var(--space-md);
+}
+
+.markdown-content ol {
+  list-style: decimal outside !important;
+  padding-left: 2rem !important;
+  margin-bottom: var(--space-md);
+}
+
+.markdown-content li {
+  margin-bottom: var(--space-xs);
+  line-height: inherit;
+  display: list-item !important;
+}
+
+.markdown-content li > ul,
+.markdown-content li > ol {
+  margin-top: var(--space-xs);
+  margin-bottom: 0;
+}
+
 /* ===== GALLERY ===== */
 .gallery-container {
   padding: var(--space-xl) var(--space-2xl);

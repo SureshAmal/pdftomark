@@ -27,12 +27,25 @@ export default function Home() {
   const [pages, setPages] = useState<Record<number, PageData>>({});
   const [isConverting, setIsConverting] = useState(false);
   const [history, setHistory] = useState<PdfMetadata[]>([]);
+  const [apiKey, setApiKey] = useState<string>("");
 
-  // Load history on mount
+  // Load history & API key on mount
   useEffect(() => {
     get<PdfMetadata[]>(HISTORY_DB_KEY).then(val => {
       if (val) setHistory(val);
     }).catch(console.error);
+
+    const savedKey = localStorage.getItem("gemini_api_key");
+    if (savedKey) setApiKey(savedKey);
+  }, []);
+
+  const handleApiKeyChange = useCallback((newKey: string) => {
+    setApiKey(newKey);
+    if (newKey) {
+      localStorage.setItem("gemini_api_key", newKey);
+    } else {
+      localStorage.removeItem("gemini_api_key");
+    }
   }, []);
 
   const pagesRef = useRef<Record<number, PageData>>({});
@@ -199,6 +212,28 @@ export default function Home() {
     conversionAbortRef.current = false;
   }, []);
 
+  // Handle global keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input or textarea
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft") {
+        setCurrentPage((prev) => Math.max(1, prev - 1));
+      } else if (e.key === "ArrowRight") {
+        setCurrentPage((prev) => (totalPages > 0 ? Math.min(totalPages, prev + 1) : prev));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [totalPages]);
+
   // Cache base64 images as pages render
   const handlePageRendered = useCallback(
     (pageNum: number, base64: string) => {
@@ -217,7 +252,7 @@ export default function Home() {
       const res = await fetch("/api/convert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, pageNumber: pageNum }),
+        body: JSON.stringify({ imageBase64: base64, pageNumber: pageNum, apiKey: localStorage.getItem("gemini_api_key") || undefined }),
       });
 
       if (!res.ok) {
@@ -495,6 +530,8 @@ export default function Home() {
         onStopConversion={stopConversion}
         onStartConversion={startConversionForRange}
         onCloseFile={handleCloseFile}
+        apiKey={apiKey}
+        onApiKeyChange={handleApiKeyChange}
       />
       <main className="app-main">
         {fileUrl ? (

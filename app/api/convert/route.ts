@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
+export const maxDuration = 60; // Set Vercel execution timeout to 60 seconds
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageBase64, pageNumber } = body;
+    const { imageBase64, pageNumber, apiKey } = body;
 
     if (!imageBase64 || !pageNumber) {
       return Response.json(
@@ -13,14 +15,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    const finalApiKey = apiKey || process.env.GEMINI_API_KEY;
+
+    if (!finalApiKey) {
       return Response.json(
-        { error: "GEMINI_API_KEY is not configured on the server" },
-        { status: 500 }
+        { error: "No Gemini API key provided by user or configured on server" },
+        { status: 400 }
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey: finalApiKey });
 
     // Strip the data URL prefix to get raw base64
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
@@ -48,11 +52,14 @@ CRITICAL RULES:
 - ABSOLUTELY DO NOT CUT, SUMMARIZE, OR TRUNCATE THE OUTPUT. You MUST output the FULL, unedited content of the entire page exactly as it appears. 
 - Every single word, sentence, and paragraph must be fully transcribed regardless of length.
 - Do NOT attempt to replicate physical visual spacing, alignment, or layout formatting using multiple spaces, tabs, or HTML entities like '&nbsp;'. Use standard single spaces.
-- Preserve proper Markdown headings (# ## ### etc.) for titles and section headers  
+- Preserverse proper Markdown headings (# ## ### etc.) for titles and section headers
 - Use proper Markdown for lists (- or 1.), bold (**text**), italic (*text*)
 - Reproduce tables using Markdown table syntax
 - Preserve code blocks with proper fencing (\`\`\`)
-- For mathematical equations, use standard KaTeX/LaTeX formatting. Enclose inline math in single dollar signs ($math$) and block math in double dollar signs ($$math$$).
+- Any diagrams, flowcharts, schemas, or structural diagrams found in the image MUST be recreated using Mermaid.js syntax within a \`\`\`mermaid ... \`\`\` code block. Ensure the syntax is absolutely valid Mermaid code without Markdown syntax breaking it. DO NOT use spaces inside node names for Flowcharts (use underscores or Quotes like \`id1["Node Name"]\`).
+- DO NOT use KaTeX/LaTeX formatting ($math$) inside Mermaid diagrams. Use standard Unicode characters (e.g., λ, α, β) for math symbols inside Mermaid graphs.
+- Never output image links like \`![image](http...)\`. Instead, trace the contents using Mermaid.
+- For mathematical equations outside of diagrams, use standard KaTeX/LaTeX formatting. Enclose inline math in single dollar signs ($math$) and block math in double dollar signs ($$math$$).
 - Do NOT describe the image or add commentary
 - Do NOT wrap the output in a code block
 - Output ONLY the converted Markdown content`,

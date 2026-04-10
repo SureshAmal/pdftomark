@@ -63,15 +63,9 @@ export default function Gallery({ history, onSelect, onDelete }: GalleryProps) {
               </p>
               
               {item.totalPages > 0 && (
-                <div className="gallery-card-progress">
-                  <div className="progress-bar-bg" style={{ height: '4px', marginTop: '8px' }}>
-                    <div 
-                      className="progress-bar-fill" 
-                      style={{ width: `${(item.convertedCount / item.totalPages) * 100}%`, height: '4px' }} 
-                    />
-                  </div>
-                  <p className="gallery-card-meta" style={{ marginTop: '4px', textAlign: 'right' }}>
-                    {item.convertedCount} / {item.totalPages} Pages
+                <div className="gallery-card-progress" style={{ marginTop: '8px', textAlign: 'right' }}>
+                  <p className="gallery-card-meta">
+                    {item.totalPages} Pages
                   </p>
                 </div>
               )}
