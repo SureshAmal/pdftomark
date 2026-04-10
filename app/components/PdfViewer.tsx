@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -23,7 +23,7 @@ export default function PdfViewer({
   onPageRendered,
 }: PdfViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const renderingRef = useRef(false);
 
@@ -38,7 +38,7 @@ export default function PdfViewer({
         const loadingTask = pdfjsLib.getDocument(fileUrl);
         const pdf = await loadingTask.promise;
         if (cancelled) return;
-        pdfDocRef.current = pdf;
+        setPdfDoc(pdf);
         onDocumentLoad(pdf.numPages);
       } catch (err) {
         console.error("Failed to load PDF:", err);
@@ -54,7 +54,7 @@ export default function PdfViewer({
 
   // Render current page
   const renderPage = useCallback(async () => {
-    const pdf = pdfDocRef.current;
+    const pdf = pdfDoc;
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!pdf || !canvas || !container || renderingRef.current) return;
@@ -89,25 +89,25 @@ export default function PdfViewer({
     } finally {
       renderingRef.current = false;
     }
-  }, [currentPage, onPageRendered]);
+  }, [currentPage, onPageRendered, pdfDoc]);
 
   useEffect(() => {
-    if (pdfDocRef.current && currentPage > 0) {
+    if (pdfDoc && currentPage > 0) {
       renderPage();
     }
-  }, [currentPage, renderPage]);
+  }, [currentPage, renderPage, pdfDoc]);
 
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      if (pdfDocRef.current && currentPage > 0) {
+      if (pdfDoc && currentPage > 0) {
         renderPage();
       }
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [currentPage, renderPage]);
+  }, [currentPage, renderPage, pdfDoc]);
 
   if (!fileUrl) {
     return (

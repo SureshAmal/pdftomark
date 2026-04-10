@@ -1,8 +1,6 @@
 import { NextRequest } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -22,10 +20,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
     // Strip the data URL prefix to get raw base64
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
-    const response = await ai.models.generateContent({
+    const responseStream = await ai.models.generateContentStream({
       model: "gemini-3.1-flash-lite-preview",
       config: {
         maxOutputTokens: 8192,
@@ -47,10 +47,12 @@ export async function POST(request: NextRequest) {
 CRITICAL RULES:
 - ABSOLUTELY DO NOT CUT, SUMMARIZE, OR TRUNCATE THE OUTPUT. You MUST output the FULL, unedited content of the entire page exactly as it appears. 
 - Every single word, sentence, and paragraph must be fully transcribed regardless of length.
+- Do NOT attempt to replicate physical visual spacing, alignment, or layout formatting using multiple spaces, tabs, or HTML entities like '&nbsp;'. Use standard single spaces.
 - Preserve proper Markdown headings (# ## ### etc.) for titles and section headers  
 - Use proper Markdown for lists (- or 1.), bold (**text**), italic (*text*)
 - Reproduce tables using Markdown table syntax
 - Preserve code blocks with proper fencing (\`\`\`)
+- For mathematical equations, use standard KaTeX/LaTeX formatting. Enclose inline math in single dollar signs ($math$) and block math in double dollar signs ($$math$$).
 - Do NOT describe the image or add commentary
 - Do NOT wrap the output in a code block
 - Output ONLY the converted Markdown content`,
@@ -60,9 +62,29 @@ CRITICAL RULES:
       ],
     });
 
-    const markdown = response.text || "";
+    const encoder = new TextEncoder();
+    const customStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of responseStream) {
+            if (chunk.text) {
+              controller.enqueue(encoder.encode(chunk.text));
+            }
+          }
+        } catch (e) {
+          controller.error(e);
+        } finally {
+          controller.close();
+        }
+      },
+    });
 
-    return Response.json({ pageNumber, markdown });
+    return new Response(customStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Transfer-Encoding": "chunked",
+      },
+    });
   } catch (error) {
     console.error("Gemini API error:", error);
     const message =

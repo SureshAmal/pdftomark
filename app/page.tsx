@@ -72,7 +72,12 @@ export default function Home() {
     conversionAbortRef.current = true;
     
     // Save blob to indexedDB
-    await set(`${newFileId}-blob`, file).catch(console.error);
+    try {
+      await set(`${newFileId}-blob`, file);
+    } catch (err) {
+      console.error("Storage quota exceeded or error saving blob", err);
+      // We can still continue, just history won't survive a reload
+    }
     
     // Add to gallery index
     setHistory(prev => {
@@ -205,8 +210,9 @@ export default function Home() {
   // Convert a single page via the API route
   const convertPage = async (
     pageNum: number,
-    base64: string
-  ): Promise<{ markdown: string } | { error: string }> => {
+    base64: string,
+    retryCount = 0
+  ): Promise<{ error: string } | { success: true }> => {
     try {
       const res = await fetch("/api/convert", {
         method: "POST",
@@ -214,14 +220,62 @@ export default function Home() {
         body: JSON.stringify({ imageBase64: base64, pageNumber: pageNum }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        return { error: data.error || "Conversion failed" };
+        if ((res.status === 429 || res.status >= 500) && retryCount < 3) {
+          if (conversionAbortRef.current) return { error: "Conversion aborted" };
+          const delay = Math.pow(2, retryCount) * 2000;
+          await new Promise((r) => setTimeout(r, delay));
+          return convertPage(pageNum, base64, retryCount + 1);
+        }
+        
+        try {
+          const data = await res.json();
+          return { error: data.error || "Conversion failed" };
+        } catch {
+          return { error: `Conversion failed with status ${res.status}` };
+        }
       }
 
-      return { markdown: data.markdown };
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullMarkdown = "";
+
+      // Initialize the page as done but empty so we start seeing streamed results immediately
+      updatePageStatus(pageNum, "done", "");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (conversionAbortRef.current) {
+          reader.cancel();
+          return { error: "Conversion aborted" };
+        }
+        
+        if (done) {
+          // Cache successful result once fully streamed
+          if (fileIdRef.current) {
+            set(`${fileIdRef.current}-page-${pageNum}`, fullMarkdown).catch(console.error);
+          }
+          break;
+        }
+        
+        const chunk = decoder.decode(value, { stream: true });
+        fullMarkdown += chunk;
+        
+        // Update the UI with the appended markdown chunk
+        updatePageStatus(pageNum, "done", fullMarkdown);
+      }
+
+      return { success: true };
     } catch (err) {
+      if (retryCount < 3) {
+        if (conversionAbortRef.current) return { error: "Conversion aborted" };
+        const delay = Math.pow(2, retryCount) * 2000;
+        await new Promise((r) => setTimeout(r, delay));
+        return convertPage(pageNum, base64, retryCount + 1);
+      }
       return {
         error: err instanceof Error ? err.message : "Network error",
       };
@@ -301,22 +355,19 @@ export default function Home() {
 
         // Call the API
         const result = await convertPage(pageNum, base64);
+        
+        // Free up memory immediately after processing
+        delete base64CacheRef.current[pageNum];
 
         if (conversionAbortRef.current) break;
 
         if ("error" in result) {
           updatePageStatus(pageNum, "error", undefined, result.error);
-        } else {
-          updatePageStatus(pageNum, "done", result.markdown);
-          // Cache successful result
-          if (fileIdRef.current) {
-            set(`${fileIdRef.current}-page-${pageNum}`, result.markdown).catch(console.error);
-          }
-        }
+        } // Streaming logic already handled successful saves in the convertPage while loop
 
-        // Small delay between pages to respect rate limits
+        // Small delay between pages to respect rate limits (e.g. 15 RPM -> 4s between requests)
         if (i < windowEnd - 1) {
-          await new Promise((r) => setTimeout(r, 300));
+          await new Promise((r) => setTimeout(r, 4000));
         }
       }
     }
@@ -356,15 +407,13 @@ export default function Home() {
     }
 
     const result = await convertPage(pageNum, base64);
+    
+    // Free up memory immediately after processing
+    delete base64CacheRef.current[pageNum];
+    
     if ("error" in result) {
       updatePageStatus(pageNum, "error", undefined, result.error);
-    } else {
-      updatePageStatus(pageNum, "done", result.markdown);
-      // Cache successful result
-      if (fileIdRef.current) {
-        set(`${fileIdRef.current}-page-${pageNum}`, result.markdown).catch(console.error);
-      }
-    }
+    } 
   };
 
   // Helper to update a page's status

@@ -1,8 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
+import ProgressBar from "./ProgressBar";
 
 export type PageStatus = "pending" | "converting" | "done" | "error";
 
@@ -25,6 +30,8 @@ export default function MarkdownPanel({
   errorMessage,
   onReconvert,
 }: MarkdownPanelProps) {
+  const [viewMode, setViewMode] = useState<"preview" | "raw">("preview");
+
   const renderContent = () => {
     switch (status) {
       case "converting":
@@ -42,14 +49,34 @@ export default function MarkdownPanel({
 
       case "done":
         return (
-          <div className="markdown-body">
-            <div className="markdown-content">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
-              >
-                {markdown || "*No content extracted from this page.*"}
-              </ReactMarkdown>
+          <div className="markdown-body" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="markdown-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {viewMode === "preview" ? (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeHighlight, rehypeKatex]}
+                >
+                  {markdown || "*No content extracted from this page.*"}
+                </ReactMarkdown>
+              ) : (
+                <textarea 
+                  value={markdown || "*No content extracted from this page.*"}
+                  readOnly
+                  style={{ 
+                    flex: 1, 
+                    width: "100%", 
+                    minHeight: "100%",
+                    fontFamily: "monospace", 
+                    fontSize: "13px",
+                    lineHeight: "1.5",
+                    resize: "none", 
+                    background: "transparent", 
+                    border: "none", 
+                    color: "var(--color-text-primary)", 
+                    outline: "none" 
+                  }}
+                />
+              )}
             </div>
           </div>
         );
@@ -94,6 +121,30 @@ export default function MarkdownPanel({
       <div className="panel-header">
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span className="panel-header-title">Markdown Output</span>
+          {status === "done" && (
+            <div style={{ display: "flex", background: "var(--color-bg-tertiary)", borderRadius: "var(--radius-md)", padding: "2px" }}>
+                <button 
+                  onClick={() => setViewMode('preview')}
+                  style={{ 
+                    padding: "4px 8px", fontSize: "12px", minHeight: "0", cursor: "pointer",
+                    background: viewMode === 'preview' ? "var(--color-bg-secondary)" : "transparent", 
+                    border: "none", borderRadius: "var(--radius-sm)", color: "var(--color-text-primary)", fontWeight: viewMode === 'preview' ? 600 : 400
+                  }}
+                >
+                  Preview
+                </button>
+                <button 
+                  onClick={() => setViewMode('raw')}
+                  style={{ 
+                    padding: "4px 8px", fontSize: "12px", minHeight: "0", cursor: "pointer",
+                    background: viewMode === 'raw' ? "var(--color-bg-secondary)" : "transparent", 
+                    border: "none", borderRadius: "var(--radius-sm)", color: "var(--color-text-primary)", fontWeight: viewMode === 'raw' ? 600 : 400
+                  }}
+                >
+                  Raw
+                </button>
+            </div>
+          )}
           {(status === "done" || status === "error") && (
             <button
               onClick={onReconvert}
@@ -108,13 +159,18 @@ export default function MarkdownPanel({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
           {totalPages > 0 && (
-            <span className={`status-badge ${status}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <>
+              <div className="hide-on-mobile" style={{ marginRight: '8px' }}>
+                <ProgressBar converted={convertedCount} total={totalPages} />
+              </div>
+              <span className={`status-badge ${status}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               {status === "converting" && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>}
               {status === "done" && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
               {status === "error" && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>}
               {status === "pending" && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>}
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </span>
+            </>
           )}
         </div>
       </div>
