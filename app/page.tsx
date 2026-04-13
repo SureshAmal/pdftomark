@@ -6,6 +6,7 @@ import { get, set } from 'idb-keyval';
 import Header from "./components/Header";
 import MarkdownPanel, { type PageStatus } from "./components/MarkdownPanel";
 import Gallery, { type PdfMetadata } from "./components/Gallery";
+import SummaryModal from "./components/SummaryModal";
 
 const PdfViewer = dynamic(() => import('./components/PdfViewer'), { ssr: false });
 
@@ -28,6 +29,7 @@ export default function Home() {
   const [isConverting, setIsConverting] = useState(false);
   const [history, setHistory] = useState<PdfMetadata[]>([]);
   const [apiKey, setApiKey] = useState<string>("");
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
 
   // Load history & API key on mount
   useEffect(() => {
@@ -518,6 +520,16 @@ export default function Home() {
     markdown: null,
   };
 
+  const getFullDocumentText = () => {
+    const parts = [];
+    for (let i = 1; i <= totalPages; i++) {
+      if (pages[i]?.status === "done" && pages[i]?.markdown) {
+        parts.push(pages[i].markdown);
+      }
+    }
+    return parts.join("\n\n---\n\n");
+  };
+
   return (
     <>
       <Header
@@ -525,6 +537,7 @@ export default function Home() {
         convertedCount={convertedCount}
         totalPages={totalPages}
         onDownloadAll={handleDownloadAll}
+        onOpenSummary={() => setIsSummaryOpen(true)}
         hasFile={!!fileUrl}
         isConverting={isConverting}
         onStopConversion={stopConversion}
@@ -577,6 +590,14 @@ export default function Home() {
         ) : (
           <Gallery history={history} onSelect={handleGallerySelect} onDelete={handleGalleryDelete} />
         )}
+        
+        <SummaryModal 
+          isOpen={isSummaryOpen} 
+          onClose={() => setIsSummaryOpen(false)} 
+          documentText={getFullDocumentText()} 
+          apiKey={apiKey}
+          fileId={fileId}
+        />
       </main>
     </>
   );
