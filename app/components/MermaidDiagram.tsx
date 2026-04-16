@@ -3,16 +3,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-  suppressErrorRendering: true,
-});
+function getMermaidTheme(): 'dark' | 'default' {
+  if (typeof document === 'undefined') return 'default';
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+}
 
 export default function MermaidDiagram({ chart }: { chart: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [themeKey, setThemeKey] = useState(0);
+
+  // Watch for theme changes on <html data-theme="...">
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setThemeKey(k => k + 1);
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -24,6 +32,14 @@ export default function MermaidDiagram({ chart }: { chart: string }) {
       
       try {
         setError(null);
+
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: getMermaidTheme(),
+          securityLevel: 'loose',
+          suppressErrorRendering: true,
+        });
+
         const cleanChart = chart.trim();
         
         const { svg, bindFunctions } = await mermaid.render(id, cleanChart);
@@ -62,7 +78,7 @@ export default function MermaidDiagram({ chart }: { chart: string }) {
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [chart]);
+  }, [chart, themeKey]);
 
   if (error) {
     return (

@@ -23,12 +23,15 @@ const HISTORY_DB_KEY = "pdf-gallery-index";
 export default function Home() {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>("document");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [pages, setPages] = useState<Record<number, PageData>>({});
   const [isConverting, setIsConverting] = useState(false);
   const [history, setHistory] = useState<PdfMetadata[]>([]);
   const [apiKey, setApiKey] = useState<string>("");
+  const [customPrompt, setCustomPrompt] = useState<string>("");
+  const [model, setModel] = useState<string>("gemini-3.1-flash-lite-preview");
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
 
   // Load history & API key on mount
@@ -39,6 +42,10 @@ export default function Home() {
 
     const savedKey = localStorage.getItem("gemini_api_key");
     if (savedKey) setApiKey(savedKey);
+    const savedPrompt = localStorage.getItem("custom_prompt");
+    if (savedPrompt) setCustomPrompt(savedPrompt);
+    const savedModel = localStorage.getItem("gemini_model");
+    if (savedModel) setModel(savedModel);
   }, []);
 
   const handleApiKeyChange = useCallback((newKey: string) => {
@@ -48,6 +55,20 @@ export default function Home() {
     } else {
       localStorage.removeItem("gemini_api_key");
     }
+  }, []);
+
+  const handleCustomPromptChange = useCallback((newPrompt: string) => {
+    setCustomPrompt(newPrompt);
+    if (newPrompt) {
+      localStorage.setItem("custom_prompt", newPrompt);
+    } else {
+      localStorage.removeItem("custom_prompt");
+    }
+  }, []);
+
+  const handleModelChange = useCallback((newModel: string) => {
+    setModel(newModel);
+    localStorage.setItem("gemini_model", newModel);
   }, []);
 
   const pagesRef = useRef<Record<number, PageData>>({});
@@ -76,6 +97,7 @@ export default function Home() {
     
     setFileUrl(url);
     setFileId(newFileId);
+    setFileName(file.name);
     fileIdRef.current = newFileId;
     
     setCurrentPage(1);
@@ -127,6 +149,7 @@ export default function Home() {
         
         setFileUrl(url);
         setFileId(meta.id);
+        setFileName(meta.name);
         fileIdRef.current = meta.id;
         
         setCurrentPage(1);
@@ -176,6 +199,7 @@ export default function Home() {
     if (fileUrl) URL.revokeObjectURL(fileUrl);
     setFileUrl(null);
     setFileId(null);
+    setFileName("document");
     fileIdRef.current = null;
     setCurrentPage(1);
     setTotalPages(0);
@@ -254,7 +278,13 @@ export default function Home() {
       const res = await fetch("/api/convert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, pageNumber: pageNum, apiKey: localStorage.getItem("gemini_api_key") || undefined }),
+        body: JSON.stringify({ 
+          imageBase64: base64, 
+          pageNumber: pageNum, 
+          apiKey: localStorage.getItem("gemini_api_key") || undefined,
+          customPrompt: localStorage.getItem("custom_prompt") || undefined,
+          model: localStorage.getItem("gemini_model") || "gemini-3.1-flash-lite-preview"
+        }),
       });
 
       if (!res.ok) {
@@ -509,10 +539,11 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "converted.md";
+    const safeName = fileName.replace(/\.pdf$/i, "");
+    a.download = `${safeName}-full-converted.md`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [pages, totalPages]);
+  }, [pages, totalPages, fileName]);
 
   // Current page data
   const currentPageData = pages[currentPage] || {
@@ -545,6 +576,10 @@ export default function Home() {
         onCloseFile={handleCloseFile}
         apiKey={apiKey}
         onApiKeyChange={handleApiKeyChange}
+        customPrompt={customPrompt}
+        onCustomPromptChange={handleCustomPromptChange}
+        model={model}
+        onModelChange={handleModelChange}
       />
       <main className="app-main">
         {fileUrl ? (
@@ -560,6 +595,7 @@ export default function Home() {
 
             {totalPages > 0 ? (
               <MarkdownPanel
+                fileName={fileName}
                 markdown={currentPageData.markdown}
                 status={currentPageData.status}
                 currentPage={currentPage}
@@ -588,7 +624,7 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <Gallery history={history} onSelect={handleGallerySelect} onDelete={handleGalleryDelete} />
+          <Gallery history={history} onSelect={handleGallerySelect} onDelete={handleGalleryDelete} onDropFile={handleFileSelect} />
         )}
         
         <SummaryModal 

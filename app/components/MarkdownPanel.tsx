@@ -19,6 +19,7 @@ interface MarkdownPanelProps {
   currentPage: number;
   totalPages: number;
   convertedCount: number;
+  fileName?: string;
   errorMessage?: string;
   onReconvert: () => void;
 }
@@ -29,10 +30,12 @@ export default function MarkdownPanel({
   currentPage,
   totalPages,
   convertedCount,
+  fileName,
   errorMessage,
   onReconvert,
 }: MarkdownPanelProps) {
   const [viewMode, setViewMode] = useState<"preview" | "raw">("preview");
+  const [isCopied, setIsCopied] = useState(false);
 
   const remarkPlugins = useMemo(() => [remarkGfm, remarkMath, remarkBreaks], []);
   const rehypePlugins = useMemo(() => [rehypeKatex, rehypeHighlight], []);
@@ -58,9 +61,18 @@ export default function MarkdownPanel({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `page-${currentPage}.md`;
+    const base = fileName ? fileName.replace(/\.pdf$/i, "") : "document";
+    a.download = `${base}-page-${currentPage}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCopy = () => {
+    if (!markdown) return;
+    navigator.clipboard.writeText(markdown).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }).catch(console.error);
   };
 
   const renderContent = () => {
@@ -182,15 +194,35 @@ export default function MarkdownPanel({
             </div>
           )}
           {status === "done" && markdown && (
-            <button
-              onClick={handleDownload}
-              className="btn btn-success"
-              style={{ padding: "4px 8px", fontSize: "12px", minHeight: "0" }}
-              aria-label="Download page"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              Download
-            </button>
+            <div style={{ display: "flex", gap: "4px" }}>
+              <button
+                onClick={handleCopy}
+                className="btn btn-secondary"
+                style={{ padding: "4px 8px", fontSize: "12px", minHeight: "0", minWidth: "70px", justifyContent: "center" }}
+                aria-label="Copy to clipboard"
+              >
+                {isCopied ? (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Copy
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleDownload}
+                className="btn btn-success"
+                style={{ padding: "4px 8px", fontSize: "12px", minHeight: "0" }}
+                aria-label="Download page"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download
+              </button>
+            </div>
           )}
           {(status === "done" || status === "error" || status === "pending") && (
             <button

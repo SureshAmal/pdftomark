@@ -6,7 +6,7 @@ export const maxDuration = 60; // Set Vercel execution timeout to 60 seconds
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageBase64, pageNumber, apiKey } = body;
+    const { imageBase64, pageNumber, apiKey, customPrompt, model } = body;
 
     if (!imageBase64 || !pageNumber) {
       return Response.json(
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
     const responseStream = await ai.models.generateContentStream({
-      model: "gemini-3.1-flash-lite-preview",
+      model: model || "gemini-3.1-flash-lite-preview",
       config: {
         maxOutputTokens: 8192,
         temperature: 0.1,
@@ -58,11 +58,10 @@ CRITICAL RULES:
 - Preserve code blocks with proper fencing (\`\`\`)
 - Any diagrams, flowcharts, schemas, or structural diagrams found in the image MUST be recreated using Mermaid.js syntax within a \`\`\`mermaid ... \`\`\` code block. Ensure the syntax is absolutely valid Mermaid code without Markdown syntax breaking it. DO NOT use spaces inside node names for Flowcharts (use underscores or Quotes like \`id1["Node Name"]\`).
 - DO NOT use KaTeX/LaTeX formatting ($math$) inside Mermaid diagrams. Use standard Unicode characters (e.g., λ, α, β) for math symbols inside Mermaid graphs.
-- Never output image links like \`![image](http...)\`. Instead, trace the contents using Mermaid.
 - For mathematical equations outside of diagrams, use standard KaTeX/LaTeX formatting. Enclose inline math in single dollar signs ($math$) and block math in double dollar signs ($$math$$).
 - Do NOT describe the image or add commentary
 - Do NOT wrap the output in a code block
-- Output ONLY the converted Markdown content`,
+- Output ONLY the converted Markdown content${customPrompt ? `\n\nUSER CUSTOM PROMPT INSTRUCTIONS:\n${customPrompt}` : ''}`,
             },
           ],
         },
